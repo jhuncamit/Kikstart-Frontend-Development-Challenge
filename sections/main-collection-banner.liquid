@@ -1,0 +1,259 @@
+{% comment %}theme-check-disable ImgLazyLoading{% endcomment %}
+{{ 'component-collection-hero.css' | asset_url | stylesheet_tag }}
+
+{%- style -%}
+  @media screen and (max-width: 749px) {
+    .collection-hero--with-image .collection-hero__inner {
+      padding-bottom: calc({{ settings.media_shadow_vertical_offset | at_least: 0 }}px + 2rem);
+    }
+
+    /* Hide tabs on mobile */
+    .tabs {
+      display: none;
+    }
+
+    /* Show dropdown on mobile */
+    .mobile-dropdown {
+      display: block;
+      width: 100%;
+      padding: 10px;
+      font-size: 16px;
+      border: 1px solid #e0e0e0;
+      border-radius: 4px;
+      margin-top: 10px;
+      font-family: 'Arial', sans-serif;
+      background-color: white;
+      cursor: pointer;
+    }
+  }
+
+  @media screen and (min-width: 750px) {
+    /* Hide dropdown on desktop */
+    .mobile-dropdown {
+      display: none;
+    }
+
+    /* Show tabs on desktop */
+    .tabs {
+      display: flex;
+      gap: 40px;
+      border-bottom: 2px solid #e0e0e0;
+      padding-bottom: 10px;
+      font-family: 'Arial', sans-serif;
+    }
+  }
+
+  .tab {
+    text-transform: uppercase;
+    font-size: 14px;
+    font-weight: bold;
+    color: #777;
+    cursor: pointer;
+    padding-bottom: 5px;
+    position: relative;
+    background: none;
+    border: none;
+  }
+
+  .tab.active {
+    color: black;
+  }
+
+  .tab.active::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    bottom: -2px;
+    width: 100%;
+    height: 2px;
+    background-color: black;
+  }
+{%- endstyle -%}
+
+<div class="collection-hero{% if section.settings.show_collection_image and collection.image %} collection-hero--with-image{% endif %} color-{{ section.settings.color_scheme }} gradient">
+  <div class="collection-hero__inner page-width {% if settings.animations_reveal_on_scroll %} scroll-trigger animate--fade-in{% endif %}">
+    <div class="collection-hero__text-wrapper">
+      <h1 class="collection-hero__title" id="collection-title" data-collection-title="{{ collection.title | escape }}">
+        {{- collection.title | escape -}}
+      </h1>
+
+      {%- if section.settings.show_collection_description -%}
+        <div class="collection-hero__description rte">{{ collection.description }}</div>
+      {%- endif -%}
+
+      <!-- Desktop Tabs -->
+      <div class="tabs">
+        {% for block in section.blocks %}
+          <button class="tab {% if forloop.first %}active{% endif %}" collection-name="{{ block.settings.collection.title }}" collection-url="{{ block.settings.collection.handle }}">
+            {{ block.settings.collection.title }}
+          </button>
+        {% endfor %}
+      </div>
+
+      <!-- Mobile Dropdown -->
+      <select class="mobile-dropdown">
+        {% for block in section.blocks %}
+          <option value="{{ block.settings.collection.handle }}" {% if forloop.first %}selected{% endif %}>
+            {{ block.settings.collection.title }}
+          </option>
+        {% endfor %}
+      </select>
+    </div>
+
+    {%- if section.settings.show_collection_image and collection.image -%}
+      <div class="collection-hero__image-container media gradient">
+        <img
+          srcset="
+            {%- if collection.image.width >= 165 -%}{{ collection.image | image_url: width: 165 }} 165w,{%- endif -%}
+            {%- if collection.image.width >= 360 -%}{{ collection.image | image_url: width: 360 }} 360w,{%- endif -%}
+            {%- if collection.image.width >= 535 -%}{{ collection.image | image_url: width: 535 }} 535w,{%- endif -%}
+            {%- if collection.image.width >= 750 -%}{{ collection.image | image_url: width: 750 }} 750w,{%- endif -%}
+            {%- if collection.image.width >= 1070 -%}{{ collection.image | image_url: width: 1070 }} 1070w,{%- endif -%}
+            {%- if collection.image.width >= 1500 -%}{{ collection.image | image_url: width: 1500 }} 1500w,{%- endif -%}
+            {{ collection.image | image_url }} {{ collection.image.width }}w
+          "
+          src="{{ collection.image | image_url: width: 750 }}"
+          sizes="(min-width: {{ settings.page_width }}px) {{ settings.page_width | minus: 100 | divided_by: 2 }}px, (min-width: 750px) calc(50vw - 130px), calc(50vw - 55px)"
+          alt="{{ collection.image.alt | escape }}"
+          width="{{ collection.image.width }}"
+          height="{{ collection.image.height }}"
+        >
+      </div>
+    {%- endif -%}
+  </div>
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  const tabButtons = document.querySelectorAll(".tab");
+  const mobileDropdown = document.querySelector(".mobile-dropdown");
+  const titleDiv = document.getElementById("collection-title");
+  const descriptionDiv = document.getElementById("collection-description");
+  const productsContainer = document.getElementById("product-grid");
+
+  let currentPath = window.location.pathname;
+
+  // Set active class based on current URL
+  tabButtons.forEach(tab => {
+    let collectionUrl = tab.getAttribute("collection-url");
+    if (currentPath.includes(collectionUrl)) {
+      tab.classList.add("active");
+      mobileDropdown.value = collectionUrl; // Sync dropdown with active tab
+    } else {
+      tab.classList.remove("active");
+    }
+  });
+
+  function loadCollection(collectionHandle) {
+    const currentParams = new URLSearchParams(window.location.search);
+    const newUrl = `/collections/${collectionHandle}?${currentParams.toString()}`;
+    history.pushState(null, null, newUrl);
+
+    fetch(newUrl)
+      .then(response => response.text())
+      .then(html => {
+        let parser = new DOMParser();
+        let doc = parser.parseFromString(html, "text/html");
+
+        let newTitle = doc.querySelector("#collection-title")?.innerText;
+        if (newTitle) {
+          titleDiv.innerText = newTitle;
+        }
+
+        let newDescription = doc.querySelector("#collection-description")?.innerHTML;
+        if (newDescription) {
+          descriptionDiv.innerHTML = newDescription;
+        }
+
+        let newProducts = doc.querySelector("#product-grid")?.innerHTML;
+        if (newProducts) {
+          productsContainer.innerHTML = newProducts;
+        }
+      })
+      .catch(error => console.error("Error loading collection:", error));
+  }
+
+  // Handle tab click
+  tabButtons.forEach(button => {
+    button.addEventListener("click", function () {
+      tabButtons.forEach(btn => btn.classList.remove("active"));
+      this.classList.add("active");
+
+      titleDiv.innerText = button.getAttribute("collection-name");
+      mobileDropdown.value = button.getAttribute("collection-url"); // Sync dropdown with active tab
+
+      loadCollection(button.getAttribute("collection-url"));
+    });
+  });
+
+  // Handle dropdown change
+  mobileDropdown.addEventListener("change", function () {
+    const selectedHandle = this.value;
+    const selectedTab = document.querySelector(`.tab[collection-url="${selectedHandle}"]`);
+
+    if (selectedTab) {
+      tabButtons.forEach(btn => btn.classList.remove("active"));
+      selectedTab.classList.add("active");
+
+      titleDiv.innerText = selectedTab.getAttribute("collection-name");
+      loadCollection(selectedHandle);
+    }
+  });
+});
+</script>
+
+{% schema %}
+{
+  "name": "t:sections.main-collection-banner.name",
+  "class": "section",
+  "settings": [
+    {
+      "type": "paragraph",
+      "content": "t:sections.main-collection-banner.settings.paragraph.content"
+    },
+    {
+      "type": "checkbox",
+      "id": "show_collection_description",
+      "default": true,
+      "label": "t:sections.main-collection-banner.settings.show_collection_description.label"
+    },
+    {
+      "type": "checkbox",
+      "id": "show_collection_image",
+      "default": false,
+      "label": "t:sections.main-collection-banner.settings.show_collection_image.label",
+      "info": "t:sections.main-collection-banner.settings.show_collection_image.info"
+    },
+    {
+      "type": "color_scheme",
+      "id": "color_scheme",
+      "label": "t:sections.all.colors.label",
+      "default": "scheme-1"
+    }
+  ],
+  "blocks": [
+    {
+      "type": "collection",
+      "name": "Collection",
+      "settings": [
+        {
+          "type": "collection",
+          "id": "collection",
+          "label": "Select Collection"
+        }
+      ]
+    }
+  ],
+  "presets": [
+    {
+      "name": "Collection Tabs",
+      "category": "Collection",
+      "blocks": [
+        { "type": "collection", "settings": { "collection": "all" } },
+        { "type": "collection", "settings": { "collection": "accessories" } },
+        { "type": "collection", "settings": { "collection": "best-sellers" } }
+      ]
+    }
+  ]
+}
+{% endschema %}
